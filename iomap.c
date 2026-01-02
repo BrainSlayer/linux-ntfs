@@ -265,13 +265,8 @@ out:
 }
 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(6, 17, 0)
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 1, 0)
 static int ntfs_read_iomap_begin_non_resident(struct inode *inode, loff_t offset,
 		loff_t length, unsigned int flags, struct iomap *iomap, bool for_clu_zero)
-#else
-static int ntfs_read_iomap_begin_non_resident(struct inode *inode, loff_t offset,
-		loff_t length, unsigned int flags, struct iomap *iomap)
-#endif
 #else
 static int ntfs_read_iomap_begin_non_resident(struct inode *inode, loff_t offset,
 		loff_t length, unsigned int flags, struct iomap *iomap)
@@ -368,22 +363,12 @@ static int ntfs_read_iomap_begin_non_resident(struct inode *inode, loff_t offset
 	return 0;
 }
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 5, 0)
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 17, 0)
 static int ntfs_read_iomap_begin(struct inode *inode, loff_t offset, loff_t length,
 		unsigned int flags, struct iomap *iomap, struct iomap *srcmap)
 #else
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 1, 0)
 static int __ntfs_read_iomap_begin(struct inode *inode, loff_t offset, loff_t length,
 		unsigned int flags, struct iomap *iomap, struct iomap *srcmap, bool for_clu_zero)
-#else
-static int ntfs_read_iomap_begin(struct inode *inode, loff_t offset, loff_t length,
-		unsigned int flags, struct iomap *iomap, struct iomap *srcmap)
-#endif
-#endif
-#else
-static int ntfs_read_iomap_begin(struct inode *inode, loff_t offset, loff_t length,
-		unsigned int flags, struct iomap *iomap)
 #endif
 {
 	struct ntfs_inode *ni = NTFS_I(inode);
@@ -391,13 +376,8 @@ static int ntfs_read_iomap_begin(struct inode *inode, loff_t offset, loff_t leng
 
 	if (NInoNonResident(ni))
 #if LINUX_VERSION_CODE < KERNEL_VERSION(6, 17, 0)
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 1, 0)
 		ret = ntfs_read_iomap_begin_non_resident(inode, offset, length,
 				flags, iomap, for_clu_zero);
-#else
-		ret = ntfs_read_iomap_begin_non_resident(inode, offset, length,
-				flags, iomap);
-#endif
 #else
 		ret = ntfs_read_iomap_begin_non_resident(inode, offset, length,
 				flags, iomap);
@@ -457,59 +437,6 @@ const struct iomap_ops ntfs_read_iomap_ops = {
 	.iomap_end = ntfs_read_iomap_end,
 };
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 1, 0)
-static int ntfs_buffered_zeroed_clusters(struct inode *vi, s64 vcn)
-{
-	struct ntfs_inode *ni = NTFS_I(vi);
-	struct ntfs_volume *vol = ni->vol;
-	struct address_space *mapping = vi->i_mapping;
-	struct page *page;
-	pgoff_t idx, idx_end;
-	u32 from, to;
-
-	idx = (vcn << vol->cluster_size_bits) >> PAGE_SHIFT;
-	idx_end = ((vcn + 1) << vol->cluster_size_bits) >> PAGE_SHIFT;
-	from = (vcn << vol->cluster_size_bits) & ~PAGE_MASK;
-	if (idx == idx_end)
-		idx_end++;
-
-	to = min_t(u32, vol->cluster_size, PAGE_SIZE);
-	for (; idx < idx_end; idx++, from = 0) {
-		if (to != PAGE_SIZE) {
-			page = read_mapping_page(mapping, idx, NULL);
-			if (IS_ERR(page))
-				return PTR_ERR(page);
-			lock_page(page);
-		} else {
-			page = grab_cache_page(mapping, idx);
-			if (!page)
-				return -ENOMEM;
-		}
-
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 18, 0)
-		if (PageUptodate(page) || iomap_is_partially_uptodate(page_folio(page), from, to))
-#else
-		if (PageUptodate(page) || iomap_is_partially_uptodate(page, from, to))
-#endif
-			goto next_page;
-
-		zero_user(page, from, to);
-
-		if (to == PAGE_SIZE)
-			SetPageUptodate(page);
-		set_page_dirty(page);
-
-next_page:
-		unlock_page(page);
-		put_page(page);
-		balance_dirty_pages_ratelimited(mapping);
-		cond_resched();
-	}
-
-	return 0;
-}
-#endif
-
 int ntfs_zero_range(struct inode *inode, loff_t offset, loff_t length, bool bdirect)
 {
 	if (bdirect) {
@@ -538,16 +465,10 @@ int ntfs_zero_range(struct inode *inode, loff_t offset, loff_t length, bool bdir
 				&ntfs_zero_read_iomap_ops,
 				NULL);
 #else
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 1, 0)
 	return iomap_zero_range(inode,
 				offset, length,
 				NULL,
 				&ntfs_zero_read_iomap_ops);
-#else
-	return ntfs_buffered_zeroed_clusters(inode,
-					     offset <<
-					     NTFS_I(inode)->vol->cluster_size_bits);
-#endif
 #endif
 #endif
 }
