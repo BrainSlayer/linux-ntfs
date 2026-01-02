@@ -1079,7 +1079,13 @@ static int ntfs_unlink(struct inode *dir, struct dentry *dentry)
 	if (vi->i_nlink)
 		mark_inode_dirty(vi);
 #else
-	vi->i_mtime = vi->i_atime = current_time(vi);
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 6, 0)
+	dir->i_mtime = inode_set_ctime_current(vi);
+	inode_set_ctime_to_ts(vi, inode_get_ctime(dir));
+#else
+	vi->i_ctime = dir->i_mtime = dir->i_ctime = current_time(dir);
+#endif
+	mark_inode_dirty(dir);
 	if (vi->i_nlink)
 		mark_inode_dirty(vi);
 #endif
@@ -1202,9 +1208,21 @@ static int ntfs_rmdir(struct inode *dir, struct dentry *dentry)
 		goto out;
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 7, 0)
-	inode_set_mtime_to_ts(vi, inode_set_atime_to_ts(vi, current_time(vi)));
+	inode_set_mtime_to_ts(dir, inode_set_ctime_current(dir));
+	mark_inode_dirty(dir);
+	inode_set_ctime_to_ts(vi, inode_get_ctime(dir));
+	if (vi->i_nlink)
+		mark_inode_dirty(vi);
 #else
-	vi->i_mtime = vi->i_atime = current_time(vi);
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 6, 0)
+	dir->i_mtime = inode_set_ctime_current(vi);
+	inode_set_ctime_to_ts(vi, inode_get_ctime(dir));
+#else
+	vi->i_ctime = dir->i_mtime = dir->i_ctime = current_time(dir);
+#endif
+	mark_inode_dirty(dir);
+	if (vi->i_nlink)
+		mark_inode_dirty(vi);
 #endif
 
 out:
