@@ -149,6 +149,18 @@ static int ntfs_readpage(struct file *file, struct page *page)
 #endif
 }
 
+void ntfs_bio_end_io(struct bio *bio)
+{
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 6, 0)
+	if (bio->bi_private)
+		folio_put((struct folio *)bio->bi_private);
+#else
+	if (bio->bi_private)
+		put_page((struct page *)bio->bi_private);
+#endif
+	bio_put(bio);
+}
+
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 6, 0)
 static int ntfs_write_mft_block(struct ntfs_inode *ni, struct folio *folio,
 		struct writeback_control *wbc)
@@ -220,8 +232,8 @@ static int ntfs_write_mft_block(struct ntfs_inode *ni, struct folio *folio,
 			if (bio && (mft_ofs != prev_mft_ofs + vol->mft_record_size)) {
 flush_bio:
 				flush_dcache_folio(folio);
-				submit_bio_wait(bio);
-				bio_put(bio);
+				bio->bi_end_io = ntfs_bio_end_io;
+				submit_bio(bio);
 				bio = NULL;
 			}
 
@@ -238,8 +250,8 @@ flush_bio:
 				   (bio_end_sector(bio) >> (vol->cluster_size_bits - 9)) !=
 				    lcn) {
 					flush_dcache_folio(folio);
-					submit_bio_wait(bio);
-					bio_put(bio);
+					bio->bi_end_io = ntfs_bio_end_io;
+					submit_bio(bio);
 					bio = NULL;
 				}
 			}
@@ -293,8 +305,8 @@ flush_bio:
 
 	if (bio) {
 		flush_dcache_folio(folio);
-		submit_bio_wait(bio);
-		bio_put(bio);
+		bio->bi_end_io = ntfs_bio_end_io;
+		submit_bio(bio);
 	}
 	flush_dcache_folio(folio);
 unm_done:
@@ -416,8 +428,8 @@ static int ntfs_write_mft_block(struct ntfs_inode *ni, struct page *page,
 			if (bio && (mft_ofs != prev_mft_ofs + vol->mft_record_size)) {
 flush_bio:
 				flush_dcache_page(page);
-				submit_bio_wait(bio);
-				bio_put(bio);
+				bio->bi_end_io = ntfs_bio_end_io;
+				submit_bio(bio);
 				bio = NULL;
 			}
 
@@ -433,8 +445,8 @@ flush_bio:
 				   (bio_end_sector(bio) >> (vol->cluster_size_bits - 9)) !=
 				    lcn) {
 					flush_dcache_page(page);
-					submit_bio_wait(bio);
-					bio_put(bio);
+					bio->bi_end_io = ntfs_bio_end_io;
+					submit_bio(bio);
 					bio = NULL;
 				}
 			}
@@ -487,8 +499,8 @@ flush_bio:
 
 	if (bio) {
 		flush_dcache_page(page);
-		submit_bio_wait(bio);
-		bio_put(bio);
+		bio->bi_end_io = ntfs_bio_end_io;
+		submit_bio(bio);
 	}
 	flush_dcache_page(page);
 unm_done:

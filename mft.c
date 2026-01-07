@@ -624,8 +624,8 @@ int ntfs_sync_mft_mirror(struct ntfs_volume *vol, const unsigned long mft_no,
 	}
 #endif
 
-	submit_bio_wait(bio);
-	bio_put(bio);
+	bio->bi_end_io = ntfs_bio_end_io;
+	submit_bio(bio);
 	/* Current state: all buffers are clean, unlocked, and uptodate. */
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 6, 0)
 	flush_dcache_folio(folio);
@@ -777,8 +777,15 @@ int write_mft_record_nolock(struct ntfs_inode *ni, struct mft_record *m, int syn
 		if (!sync && ni->mft_no < vol->mftmirr_size)
 			ntfs_sync_mft_mirror(vol, ni->mft_no, fixup_m);
 
-		submit_bio_wait(bio);
-		bio_put(bio);
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 6, 0)
+		folio_get(folio);
+		bio->bi_private = folio;
+#else
+		get_page(page);
+		bio->bi_private = page;
+#endif
+		bio->bi_end_io = ntfs_bio_end_io;
+		submit_bio(bio);
 		offset += vol->cluster_size;
 		i++;
 	}
