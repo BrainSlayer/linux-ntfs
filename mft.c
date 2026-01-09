@@ -2963,7 +2963,9 @@ int ntfs_mft_record_free(struct ntfs_volume *vol, struct ntfs_inode *ni)
 		seq_no++;
 	ni_mrec->sequence_number = cpu_to_le16(seq_no);
 
+	down_read(&NTFS_I(vol->mft_ino)->runlist.lock);
 	err = ntfs_get_block_mft_record(NTFS_I(vol->mft_ino), ni);
+	up_read(&NTFS_I(vol->mft_ino)->runlist.lock);
 	if (err) {
 		unmap_mft_record(ni);
 		return err;
