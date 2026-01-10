@@ -2872,7 +2872,7 @@ mft_rec_already_initialized:
 		vol->mft_data_pos = bit + 1;
 	}
 	if (!base_ni || base_ni->mft_no != FILE_MFT)
-		mutex_unlock(&NTFS_I(vol->mft_ino)->mrec_lock);
+		mutex_unlock(&mft_ni->mrec_lock);
 	memalloc_nofs_restore(memalloc_flags);
 
 	/*
@@ -2912,7 +2912,7 @@ max_err_out:
 		"Cannot allocate mft record because the maximum number of inodes (2^32) has already been reached.");
 	if (!base_ni || base_ni->mft_no != FILE_MFT) {
 		up_write(&vol->mftbmp_lock);
-		mutex_unlock(&NTFS_I(vol->mft_ino)->mrec_lock);
+		mutex_unlock(&mft_ni->mrec_lock);
 	}
 	memalloc_nofs_restore(memalloc_flags);
 	return -ENOSPC;
