@@ -17,7 +17,7 @@
 #include "iomap.h"
 
 /*
- * ioomap_zero_range is called for an area beyond the initialized size,
+ * iomap_zero_range is called for an area beyond the initialized size,
  * garbage values can be read, so zeroing out is needed.
  */
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 3, 0)
