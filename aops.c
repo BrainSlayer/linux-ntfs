@@ -143,6 +143,14 @@ static int ntfs_readpage(struct file *file, struct page *page)
 #endif
 }
 
+/*
+ * ntfs_bio_end_io - bio completion callback for MFT record writes
+ *
+ * Decrements the folio reference count that was incremented before
+ * submit_bio(). This prevents a race condition where umount could
+ * evict the inode and release the folio while I/O is still in flight,
+ * potentially causing data corruption or use-after-free.
+ */
 void ntfs_bio_end_io(struct bio *bio)
 {
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 6, 0)
