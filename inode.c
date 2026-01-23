@@ -3786,11 +3786,15 @@ static s64 __ntfs_inode_resident_attr_pwrite(struct inode *vi,
 		goto out;
 	}
 	if (!folio_test_uptodate(folio)) {
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 8, 0)
+		folio_fill_tail(folio, 0, addr,
+				le32_to_cpu(ctx->attr->data.resident.value_length));
+#else
 		u32 len = le32_to_cpu(ctx->attr->data.resident.value_length);
-
 		memcpy_to_folio(folio, 0, addr, len);
 		folio_zero_segment(folio, offset_in_folio(folio, len),
 				   folio_size(folio) - len);
+#endif
 	} else {
 		memcpy_to_folio(folio, offset_in_folio(folio, pos), buf, count);
 	}

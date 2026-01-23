@@ -1670,7 +1670,6 @@ int ntfs_attr_make_non_resident(struct ntfs_inode *ni, const u32 data_size)
 	struct page *page;
 #endif
 	struct runlist_element *rl;
-	u8 *kaddr;
 	unsigned long flags;
 	int mp_size, mp_ofs, name_ofs, arec_size, err, err2;
 	u32 attr_size;
@@ -1816,17 +1815,23 @@ int ntfs_attr_make_non_resident(struct ntfs_inode *ni, const u32 data_size)
 	WARN_ON(attr_size != data_size);
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 6, 0)
 	if (folio && !folio_test_uptodate(folio)) {
-		kaddr = kmap_local_folio(folio, 0);
-		memcpy(kaddr, (u8 *)a +
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 8, 0)
+		folio_fill_tail(folio, 0, (u8 *)a +
 				le16_to_cpu(a->data.resident.value_offset),
 				attr_size);
-		memset(kaddr + attr_size, 0, PAGE_SIZE - attr_size);
-		kunmap_local(kaddr);
-		flush_dcache_folio(folio);
+#else
+		memcpy_to_folio(folio, 0, (u8 *)a +
+				le16_to_cpu(a->data.resident.value_offset),
+				attr_size);
+		folio_zero_segment(folio, offset_in_folio(folio, attr_size),
+				   folio_size(folio) - attr_size);
+#endif
 		folio_mark_uptodate(folio);
 	}
 #else
 	if (page && !PageUptodate(page)) {
+		u8 *kaddr;
+
 		kaddr = kmap_atomic(page);
 		memcpy(kaddr, (u8 *)a +
 				le16_to_cpu(a->data.resident.value_offset),
@@ -1990,6 +1995,8 @@ undo_err_out:
 		memcpy_from_folio((u8 *)a + mp_ofs, folio, 0, attr_size);
 #else
 	if (page) {
+		u8 *kaddr;
+
 		kaddr = kmap_atomic(page);
 		memcpy((u8 *)a + mp_ofs, kaddr, attr_size);
 		kunmap_atomic(kaddr);
