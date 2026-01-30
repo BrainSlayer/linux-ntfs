@@ -64,8 +64,8 @@ enum ntfs_inode_mutex_lock_class {
  * @folio: The folio containing the mft record of the inode.
  * @folio_ofs: Offset into the folio at which the mft record begins.
  * @mft_lcn: Number containing the mft record.
- * @mft_lcn_count: Number of clusters per mft record. 
- * 
+ * @mft_lcn_count: Number of clusters per mft record.
+ *
  * Attribute list support (only for use by the attribute lookup
  * functions). Setup during read_inode for all inodes with attribute
  * lists. Only valid if NI_AttrList is set in state.
@@ -97,7 +97,7 @@ enum ntfs_inode_mutex_lock_class {
  *   record. For fake inodes, the real (base) inode to which the attribute
  *   belongs.
  * @i_dealloc_clusters: delayed allocated clusters.
- * @target: symlink buffer. 
+ * @target: symlink buffer.
  */
 struct ntfs_inode {
 	rwlock_t size_lock;
