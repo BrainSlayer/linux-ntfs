@@ -500,7 +500,6 @@ static loff_t ntfs_file_llseek(struct file *file, loff_t offset, int whence)
 	if (offset < 0)
 		return offset;
 	return vfs_setpos(file, offset, inode->i_sb->s_maxbytes);
-
 }
 
 static ssize_t ntfs_file_read_iter(struct kiocb *iocb, struct iov_iter *to)
