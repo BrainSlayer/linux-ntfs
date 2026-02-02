@@ -11,6 +11,20 @@
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 6, 0)
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 16, 0)
+/*
+ * ntfs_bdev_read - Read data directly from block device using bio
+ * @bdev:	block device to read from
+ * @sector:	starting sector number
+ * @count:	number of bytes to read
+ * @data:	destination buffer
+ *
+ * Reads @count bytes starting from @sector directly from the block device
+ * using one or more BIOs. This function bypasses the page cache completely
+ * and performs synchronous I/O with REQ_META | REQ_SYNC flags set.
+ *
+ * If the destination buffer @data is not a vmalloc address, it falls back
+ * to the more efficient bdev_rw_virt() helper.
+ */
 int ntfs_bdev_read(struct block_device *bdev, sector_t sector, unsigned int count,
 		 char *data)
 {
@@ -125,6 +139,17 @@ int ntfs_dev_read(struct super_block *sb, void *buf, loff_t start, loff_t size)
 
 #endif
 
+/*
+ * ntfs_bdev_write - Update block device contents via page cache
+ * @sb:		super block of the mounted NTFS filesystem
+ * @buf:	source buffer containing data to write
+ * @start:	starting byte offset on the block device
+ * @size:	number of bytes to write
+ *
+ * Writes @size bytes from @buf to the block device (sb->s_bdev) starting
+ * at byte offset @start. The write is performed entirely through the page
+ * cache of the block device's address space.
+ */
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 6, 0)
 int ntfs_bdev_write(struct super_block *sb, void *buf, loff_t start, loff_t size)
 {
