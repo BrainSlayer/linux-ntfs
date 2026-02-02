@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 /*
- * NTFS block device I/O
+ * NTFS block device I/O.
  *
  * Copyright (c) 2026 LG Electronics Co., Ltd.
  */
@@ -120,4 +120,81 @@ int ntfs_dev_read(struct super_block *sb, void *buf, loff_t start, loff_t size)
 	return 0;
 }
 
+#endif
+
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 6, 0)
+int ntfs_bdev_write(struct super_block *sb, void *buf, loff_t start, loff_t size)
+{
+	pgoff_t idx, idx_end;
+	loff_t offset, end = start + size;
+	u32 from, to, buf_off = 0;
+	struct folio *folio;
+
+	idx = start >> PAGE_SHIFT;
+	idx_end = end >> PAGE_SHIFT;
+	from = start & ~PAGE_MASK;
+
+	if (idx == idx_end)
+		idx_end++;
+
+	for (; idx < idx_end; idx++, from = 0) {
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 11, 0)
+		folio = read_mapping_folio(sb->s_bdev->bd_mapping, idx, NULL);
+#else
+		folio = read_mapping_folio(sb->s_bdev->bd_inode->i_mapping, idx, NULL);
+#endif
+		if (IS_ERR(folio)) {
+			ntfs_error(sb, "Unable to read %ld page", idx);
+			return PTR_ERR(folio);
+		}
+
+		offset = (loff_t)idx << PAGE_SHIFT;
+		to = min_t(u32, end - offset, PAGE_SIZE);
+
+		memcpy_to_folio(folio, from, buf + buf_off, to);
+		buf_off += to;
+		folio_mark_uptodate(folio);
+		folio_mark_dirty(folio);
+		folio_put(folio);
+	}
+
+	return 0;
+}
+#else
+int ntfs_bdev_write(struct super_block *sb, void *buf, loff_t start, loff_t size)
+{
+	pgoff_t idx, idx_end;
+	loff_t offset, end = start + size;
+	u32 from, to, buf_off = 0;
+	struct page *page;
+	char *kaddr;
+
+	idx = start >> PAGE_SHIFT;
+	idx_end = end >> PAGE_SHIFT;
+	from = start & ~PAGE_MASK;
+
+	if (idx == idx_end)
+		idx_end++;
+
+	for (; idx < idx_end; idx++, from = 0) {
+		page = read_mapping_page(sb->s_bdev->bd_inode->i_mapping, idx, NULL);
+		if (IS_ERR(page)) {
+			ntfs_error(sb, "Unable to read %ld page", idx);
+			return PTR_ERR(page);
+		}
+
+		kaddr = kmap_atomic(page);
+		offset = (loff_t)idx << PAGE_SHIFT;
+		to = min_t(u32, end - offset, PAGE_SIZE);
+
+		memcpy(kaddr + from, buf + buf_off, to);
+		buf_off += to;
+		kunmap_atomic(kaddr);
+		SetPageUptodate(page);
+		set_page_dirty(page);
+		put_page(page);
+	}
+
+	return 0;
+}
 #endif
