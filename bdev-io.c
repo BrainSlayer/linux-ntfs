@@ -1,3 +1,10 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
+/*
+ * NTFS block device I/O
+ *
+ * Copyright (c) 2026 LG Electronics Co., Ltd.
+ */
+
 #include "ntfs.h"
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 6, 0)
