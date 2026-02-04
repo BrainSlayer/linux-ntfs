@@ -22,7 +22,6 @@
 
 #include "lcnalloc.h"
 #include "ntfs.h"
-#include "aops.h"
 #include "reparse.h"
 #include "ea.h"
 #include "iomap.h"
